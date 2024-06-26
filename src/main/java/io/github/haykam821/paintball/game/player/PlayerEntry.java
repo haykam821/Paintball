@@ -1,16 +1,19 @@
 package io.github.haykam821.paintball.game.player;
 
+import io.github.haykam821.paintball.game.StainRemovalConfig;
 import io.github.haykam821.paintball.game.item.PaintballItems;
 import io.github.haykam821.paintball.game.phase.PaintballActivePhase;
 import io.github.haykam821.paintball.game.player.armor.ArmorSet;
 import io.github.haykam821.paintball.game.player.team.TeamEntry;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.GameMode;
 import xyz.nucleoid.plasmid.util.ItemStackBuilder;
 
@@ -18,6 +21,8 @@ public class PlayerEntry {
 	private static final ItemStack HAND_STACK = ItemStackBuilder.of(PaintballItems.PAINTBALL_LAUNCHER)
 		.setUnbreakable()
 		.build();
+
+	private static final int RAIN_PARTICLE_COUNT = 50;
 
 	private final PaintballActivePhase phase;
 	private final ServerPlayerEntity player;
@@ -63,6 +68,7 @@ public class PlayerEntry {
 
 		if (!spectator) {
 			this.player.giveItemStack(HAND_STACK.copy());
+			this.phase.getConfig().getStainRemoval().give(this.player);
 			this.applyDamageRepresentation(0);
 		}
 	}
@@ -121,6 +127,44 @@ public class PlayerEntry {
 
 		float pitch = (this.player.getRandom().nextFloat() * 0.3f) + 1.2f;
 		this.player.playSound(SoundEvents.ENTITY_PLAYER_SPLASH_HIGH_SPEED, SoundCategory.PLAYERS, 1, pitch);
+
+		this.applyDamageRepresentation(this.getDamageProgress());
+	}
+
+	/**
+	 * Removes damage from the player based on stain removal configuration and applies their damage representation accordingly.
+	 */
+	public void recover(StainRemovalConfig config) {
+		int oldDamage = this.damage;
+		this.damage = config.modifyDamage(this.player, this.damage);
+
+		// Apply heart particles
+		Random random = this.player.getRandom();
+
+		if (this.damage != oldDamage) {
+			for (int index = 0; index < 3; index++) {
+				double x = this.player.getParticleX(1);
+				double y = this.player.getRandomBodyY() + 0.5;
+				double z = this.player.getParticleZ(1);
+
+				double deltaX = random.nextGaussian() * 0.02;
+				double deltaY = random.nextGaussian() * 0.02;
+				double deltaZ = random.nextGaussian() * 0.02;
+
+				this.player.getServerWorld().spawnParticles(ParticleTypes.HEART, x, y, z, 1, deltaX, deltaY, deltaZ, 1);
+			}
+		}
+
+		// Apply rain particles
+		double x = this.player.getX();
+		double y = this.player.getBodyY(0.5);
+		double z = this.player.getZ();
+
+		double deltaX = this.player.getWidth() / 2;
+		double deltaY = this.player.getHeight() / 4;
+		double deltaZ = this.player.getWidth() / 2;
+
+		this.player.getServerWorld().spawnParticles(ParticleTypes.RAIN, x, y, z, RAIN_PARTICLE_COUNT, deltaX, deltaY, deltaZ, 1);
 
 		this.applyDamageRepresentation(this.getDamageProgress());
 	}

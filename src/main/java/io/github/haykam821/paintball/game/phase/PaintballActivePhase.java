@@ -4,10 +4,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import io.github.haykam821.paintball.Main;
 import io.github.haykam821.paintball.game.PaintballConfig;
+import io.github.haykam821.paintball.game.StainRemovalConfig;
 import io.github.haykam821.paintball.game.event.LaunchPaintballEvent;
 import io.github.haykam821.paintball.game.map.BlockStaining;
 import io.github.haykam821.paintball.game.map.PaintballMap;
@@ -18,11 +20,13 @@ import io.github.haykam821.paintball.game.player.armor.StainedArmorHelper;
 import io.github.haykam821.paintball.game.player.team.TeamEntry;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.projectile.ProjectileEntity;
+import net.minecraft.entity.projectile.thrown.PotionEntity;
 import net.minecraft.entity.projectile.thrown.SnowballEntity;
 import net.minecraft.item.DyeItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.registry.entry.RegistryEntryList;
 import net.minecraft.scoreboard.Team;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -31,6 +35,7 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.DyeColor;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 import xyz.nucleoid.plasmid.game.GameActivity;
@@ -145,7 +150,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 	// Listeners
 	@Override
 	public ActionResult onHitBlock(ProjectileEntity entity, BlockHitResult hitResult) {
-		if (this.config.getStainRadius() > 0) {
+		if (!this.tryApplyStainRemoval(hitResult.getPos(), entity) && this.config.getStainRadius() > 0) {
 			if (entity.getOwner() instanceof ServerPlayerEntity) {
 				PlayerEntry entry = this.getPlayerEntry((ServerPlayerEntity) entity.getOwner());
 				if (entry != null) {
@@ -167,7 +172,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 
 	@Override
 	public ActionResult onHitEntity(ProjectileEntity entity, EntityHitResult hitResult) {
-		if (hitResult.getEntity() instanceof ServerPlayerEntity) {
+		if (!this.tryApplyStainRemoval(hitResult.getPos(), entity) && hitResult.getEntity() instanceof ServerPlayerEntity) {
 			ServerPlayerEntity player = (ServerPlayerEntity) hitResult.getEntity();
 
 			PlayerEntry entry = this.getPlayerEntry(player);
@@ -301,6 +306,35 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 
 	public void sendMessage(Text message) {
 		this.gameSpace.getPlayers().sendMessage(message);
+	}
+
+	/**
+	 * @return whether this projectile acted as a stain remover
+	 */
+	private boolean tryApplyStainRemoval(Vec3d pos, ProjectileEntity projectile) {
+		StainRemovalConfig config = this.getConfig().getStainRemoval();
+
+		if (!(projectile instanceof PotionEntity potion)) return false;
+
+		Optional<RegistryEntryList<Item>> items = config.getItems();
+
+		if (items.isEmpty()) return false;
+		if (!items.get().contains(potion.getStack().getRegistryEntry())) return false;
+
+		if (!(projectile.getOwner() instanceof ServerPlayerEntity player)) return false;
+
+		PlayerEntry owner = this.getPlayerEntry(player);
+		if (owner == null) return false;
+
+		float radius = config.radius().get(this.world.getRandom());
+
+		for (PlayerEntry entry : this.players) {
+			if (owner.getTeam() == entry.getTeam() && entry.getPlayer().getPos().distanceTo(pos) <= radius) {
+				entry.recover(config);
+			}
+		}
+
+		return true;
 	}
 
 	private PlayerEntry getPlayerEntry(ServerPlayerEntity player) {

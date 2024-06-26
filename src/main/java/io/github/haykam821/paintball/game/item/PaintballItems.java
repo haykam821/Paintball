@@ -8,7 +8,8 @@ import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
 
 public enum PaintballItems implements ItemConvertible {
-	PAINTBALL_LAUNCHER("paintball_launcher", new PaintballLauncherItem(new Item.Settings()));
+	PAINTBALL_LAUNCHER("paintball_launcher", new PaintballLauncherItem(new Item.Settings())),
+	STAIN_REMOVER("stain_remover", new StainRemoverItem(new Item.Settings()));
 
 	private final Identifier id;
 	private final Item item;

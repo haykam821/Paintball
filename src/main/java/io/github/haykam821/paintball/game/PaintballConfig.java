@@ -16,6 +16,7 @@ public class PaintballConfig {
 			Identifier.CODEC.fieldOf("map").forGetter(PaintballConfig::getMap),
 			PlayerConfig.CODEC.fieldOf("players").forGetter(PaintballConfig::getPlayerConfig),
 			GameTeamList.CODEC.fieldOf("teams").forGetter(PaintballConfig::getTeams),
+			StainRemovalConfig.CODEC.optionalFieldOf("stain_removal", StainRemovalConfig.DEFAULT).forGetter(PaintballConfig::getStainRemoval),
 			IntProvider.NON_NEGATIVE_CODEC.optionalFieldOf("ticks_until_close", ConstantIntProvider.create(SharedConstants.TICKS_PER_SECOND * 5)).forGetter(PaintballConfig::getTicksUntilClose),
 			Codec.INT.optionalFieldOf("max_damage", 4).forGetter(PaintballConfig::getMaxDamage),
 			Codec.BOOL.optionalFieldOf("allow_friendly_fire", false).forGetter(PaintballConfig::shouldAllowFriendlyFire),
@@ -26,15 +27,17 @@ public class PaintballConfig {
 	private final Identifier map;
 	private final PlayerConfig playerConfig;
 	private final GameTeamList teams;
+	private final StainRemovalConfig stainRemoval;
 	private final IntProvider ticksUntilClose;
 	private final int maxDamage;
 	private final boolean allowFriendlyFire;
 	private final int stainRadius;
 
-	public PaintballConfig(Identifier map, PlayerConfig playerConfig, GameTeamList teams, IntProvider ticksUntilClose, int maxDamage, boolean allowFriendlyFire, int stainRadius) {
+	public PaintballConfig(Identifier map, PlayerConfig playerConfig, GameTeamList teams, StainRemovalConfig stainRemoval, IntProvider ticksUntilClose, int maxDamage, boolean allowFriendlyFire, int stainRadius) {
 		this.map = map;
 		this.playerConfig = playerConfig;
 		this.teams = teams;
+		this.stainRemoval = stainRemoval;
 		this.ticksUntilClose = ticksUntilClose;
 		this.maxDamage = maxDamage;
 		this.allowFriendlyFire = allowFriendlyFire;
@@ -51,6 +54,10 @@ public class PaintballConfig {
 
 	public GameTeamList getTeams() {
 		return this.teams;
+	}
+
+	public StainRemovalConfig getStainRemoval() {
+		return this.stainRemoval;
 	}
 
 	public IntProvider getTicksUntilClose() {

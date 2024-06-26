@@ -5,6 +5,7 @@ import io.github.haykam821.paintball.game.item.PaintballItems;
 import io.github.haykam821.paintball.game.phase.PaintballWaitingPhase;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.block.Block;
+import net.minecraft.item.Item;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.util.Identifier;
@@ -21,6 +22,9 @@ public class Main implements ModInitializer {
 
 	private static final Identifier STAINABLE_TERRACOTTA_ID = new Identifier(MOD_ID, "stainable_terracotta");
 	public static final TagKey<Block> STAINABLE_TERRACOTTA = TagKey.of(RegistryKeys.BLOCK, STAINABLE_TERRACOTTA_ID);
+
+	private static final Identifier STAIN_REMOVERS_ID = new Identifier(MOD_ID, "stain_removers");
+	public static final TagKey<Item> STAIN_REMOVERS = TagKey.of(RegistryKeys.ITEM, STAIN_REMOVERS_ID);
 
 	@Override
 	public void onInitialize() {

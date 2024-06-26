@@ -2,6 +2,7 @@
 	"game.paintball.garden_paintball": "Paintball: Garden",
 	"gameType.paintball.paintball": "Paintball",
 	"item.paintball.paintball_launcher": "Paintball Launcher",
+	"item.paintball.stain_remover": "Stain Remover",
 	"text.paintball.eliminated": "%s has been eliminated!",
 	"text.paintball.eliminated.by": "%s has been eliminated by %s!",
 	"text.paintball.eliminated.out_of_bounds": "%s has been eliminated by going out of bounds!",
