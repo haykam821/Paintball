@@ -27,7 +27,7 @@ public class WinManager {
 	public Text getWin() {
 		this.playerCounts.clear();
 		for (PlayerEntry entry : this.phase.getPlayers()) {
-			if (entry.getTeam() != null) {
+			if (entry.getTeam() != null && entry.isAlive()) {
 				this.playerCounts.addTo(entry.getTeam(), 1);
 			}
 		}

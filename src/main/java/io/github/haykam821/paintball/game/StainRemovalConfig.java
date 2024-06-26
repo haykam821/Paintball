@@ -55,14 +55,13 @@ public record StainRemovalConfig(
 	/**
 	 * Gives a player the initial item stacks for a stain remover.
 	 */
-	public void give(ServerPlayerEntity player) {
+	public void give(ServerPlayerEntity player, int count) {
 		Random random = player.getRandom();
 
 		this.getItems()
 			.flatMap(items -> items.getRandom(random))
 			.map(RegistryEntry::value)
 			.ifPresent(item -> {
-				int count = this.initialCount().get(random);
 				ItemStack stack = new ItemStack(item, count);
 
 				if (stack.isOf(PaintballItems.STAIN_REMOVER.asItem())) {

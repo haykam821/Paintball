@@ -6,6 +6,7 @@ import io.github.haykam821.paintball.game.phase.PaintballActivePhase;
 import io.github.haykam821.paintball.game.player.armor.ArmorSet;
 import io.github.haykam821.paintball.game.player.team.TeamEntry;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -13,6 +14,7 @@ import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.GameMode;
 import xyz.nucleoid.plasmid.util.ItemStackBuilder;
@@ -27,13 +29,22 @@ public class PlayerEntry {
 	private final PaintballActivePhase phase;
 	private final ServerPlayerEntity player;
 	private final TeamEntry team;
+
 	private int damage = 0;
 	private PlayerEntry lastDamager;
+
+	private RevivalMarker marker;
+	private int stainRemovers;
 
 	public PlayerEntry(PaintballActivePhase phase, ServerPlayerEntity player, TeamEntry team) {
 		this.phase = phase;
 		this.player = player;
 		this.team = team;
+
+		StainRemovalConfig stainRemoval = this.phase.getConfig().getStainRemoval();
+		Random random = this.player.getRandom();
+
+		this.stainRemovers = stainRemoval.initialCount().get(random);
 	}
 
 	// Getters
@@ -47,19 +58,36 @@ public class PlayerEntry {
 
 	// Utilities
 	public void spawn(boolean spectator) {
-		// State
-		this.player.changeGameMode(spectator ? GameMode.SPECTATOR : GameMode.SURVIVAL);
-		this.player.setAir(this.player.getMaxAir());
-		this.player.setFireTicks(0);
-		this.player.fallDistance = 0;
-		this.player.clearStatusEffects();
-
 		// Position
 		if (spectator) {
 			this.phase.getMap().teleportToSpectatorSpawn(this.player);
 		} else {
 			this.team.teleportToSpawn(this.player);
 		}
+
+		this.spawnWithoutTeleport(spectator);
+	}
+
+	public void spawnAtRevivalMarker(RevivalMarker marker, boolean spectator) {
+		Vec3d pos = marker.getPos();
+		double y = pos.getY() + (spectator ? 1 : 0);
+
+		player.teleport(player.getServerWorld(), pos.getX(), y, pos.getZ(), marker.getYaw(), marker.getPitch());
+
+		this.spawnWithoutTeleport(spectator);
+
+		if (!spectator) {
+			marker.destroy();
+		}
+	}
+
+	private void spawnWithoutTeleport(boolean spectator) {
+		// State
+		this.player.changeGameMode(spectator ? GameMode.SPECTATOR : GameMode.SURVIVAL);
+		this.player.setAir(this.player.getMaxAir());
+		this.player.setFireTicks(0);
+		this.player.fallDistance = 0;
+		this.player.clearStatusEffects();
 
 		// Inventory
 		this.player.getInventory().clear();
@@ -68,12 +96,12 @@ public class PlayerEntry {
 
 		if (!spectator) {
 			this.player.giveItemStack(HAND_STACK.copy());
-			this.phase.getConfig().getStainRemoval().give(this.player);
+			this.phase.getConfig().getStainRemoval().give(this.player, this.stainRemovers);
 			this.applyDamageRepresentation(0);
 		}
 	}
 
-	private float getDamageProgress() {
+	protected float getDamageProgress() {
 		int maxDamage = this.phase.getConfig().getMaxDamage();
 		if (maxDamage == 0) {
 			return 1;
@@ -86,11 +114,11 @@ public class PlayerEntry {
 		return damageProgress >= minStainedDamage ? this.phase.getStainedArmorSet() : this.team.getArmorSet();
 	}
 
-	private void applyArmor(float damageProgress) {
-		this.player.equipStack(EquipmentSlot.HEAD, (this.getArmorSetForDamageProgress(damageProgress, 1)).getHelmet(this.team));
-		this.player.equipStack(EquipmentSlot.CHEST, (this.getArmorSetForDamageProgress(damageProgress, 0.5f)).getChestplate(this.team));
-		this.player.equipStack(EquipmentSlot.LEGS, (this.getArmorSetForDamageProgress(damageProgress, 0.75f)).getLeggings(this.team));
-		this.player.equipStack(EquipmentSlot.FEET, (this.getArmorSetForDamageProgress(damageProgress, 0.25f)).getBoots(this.team));
+	protected void applyArmor(float damageProgress, LivingEntity entity) {
+		entity.equipStack(EquipmentSlot.HEAD, (this.getArmorSetForDamageProgress(damageProgress, 1)).getHelmet(this.team));
+		entity.equipStack(EquipmentSlot.CHEST, (this.getArmorSetForDamageProgress(damageProgress, 0.5f)).getChestplate(this.team));
+		entity.equipStack(EquipmentSlot.LEGS, (this.getArmorSetForDamageProgress(damageProgress, 0.75f)).getLeggings(this.team));
+		entity.equipStack(EquipmentSlot.FEET, (this.getArmorSetForDamageProgress(damageProgress, 0.25f)).getBoots(this.team));
 	}
 
 	private void applyHealth(float damageProgress) {
@@ -108,7 +136,7 @@ public class PlayerEntry {
 	 * Applies damage representation in the form of health and armor.
 	 */
 	private void applyDamageRepresentation(float damageProgress) {
-		this.applyArmor(damageProgress);
+		this.applyArmor(damageProgress, this.player);
 		this.applyHealth(damageProgress);
 
 		this.player.currentScreenHandler.sendContentUpdates();
@@ -132,11 +160,16 @@ public class PlayerEntry {
 	}
 
 	/**
-	 * Removes damage from the player based on stain removal configuration and applies their damage representation accordingly.
+	 * Revives or removes damage from the player based on stain removal configuration and updates player state accordingly.
 	 */
 	public void recover(StainRemovalConfig config) {
 		int oldDamage = this.damage;
 		this.damage = config.modifyDamage(this.player, this.damage);
+
+		if (!this.isAlive() && this.getDamageProgress() <= 1) {
+			this.spawnAtRevivalMarker(this.marker, false);
+			this.marker = null;
+		}
 
 		// Apply heart particles
 		Random random = this.player.getRandom();
@@ -169,34 +202,64 @@ public class PlayerEntry {
 		this.applyDamageRepresentation(this.getDamageProgress());
 	}
 
+	public void decrementStainRemovers() {
+		if (this.stainRemovers > 0) {
+			this.stainRemovers -= 1;
+		}
+	}
+
+	public boolean isAlive() {
+		return this.marker == null;
+	}
+
+	public Vec3d getRecoveryPos() {
+		return this.isAlive() ? this.player.getPos() : this.marker.getPos();
+	}
+
 	/**
 	 * Ticks the player.
-	 * @return whether the player should be eliminated
+	 * @return an elimination result if the player should be eliminated, or {@code null} otherwise
 	 */
-	public Text tick() {
-		if (this.phase.getMap().isOutOfBounds(this.player)) {
-			return this.getOutOfBoundsEliminationMessage();
+	public EliminationResult tick() {
+		if (this.isAlive()) {
+			if (this.phase.getMap().isOutOfBounds(this.player)) {
+				return new EliminationResult(this.getOutOfBoundsEliminationMessage(), false);
+			} else if (this.getDamageProgress() > 1) {
+				Text message = this.lastDamager == null ? this.getGenericEliminationMessage() : this.getDamageEliminationMessage();
+				return new EliminationResult(message, true);
+			}
 		}
 
-		if (this.getDamageProgress() > 1) {
-			return this.lastDamager == null ? this.getGenericEliminationMessage() : this.getDamageEliminationMessage();
-		}
 		return null;
 	}
 
-	public void eliminate(Text message, boolean remove) {
-		if (this.phase.isGameEnding()) return;
+	public boolean eliminate(EliminationResult result, boolean remove) {
+		if (this.phase.isGameEnding()) return false;
 
-		this.phase.sendMessage(message);
+		this.phase.sendMessage(result.message());
+
+		if (result.revivable() && this.phase.getConfig().hasRevival()) {
+			this.marker = RevivalMarker.spawnFromPlayer(this);
+			this.spawnAtRevivalMarker(marker, true);
+
+			return false;
+		}
+
+		if (!this.isAlive()) {
+			this.marker.destroy();
+			this.marker = null;
+		}
 
 		if (remove) {
 			this.phase.getPlayers().remove(this);
 		}
 		this.spawn(true);
+
+		return true;
 	}
 
-	public void eliminate(boolean remove) {
-		this.eliminate(this.getGenericEliminationMessage(), remove);
+	public void eliminateFromGameRemove(boolean remove) {
+		this.eliminate(new EliminationResult(this.getGenericEliminationMessage(), false), remove);
 	}
 
 	private Text getOutOfBoundsEliminationMessage() {

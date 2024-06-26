@@ -20,6 +20,7 @@ public class PaintballConfig {
 			IntProvider.NON_NEGATIVE_CODEC.optionalFieldOf("ticks_until_close", ConstantIntProvider.create(SharedConstants.TICKS_PER_SECOND * 5)).forGetter(PaintballConfig::getTicksUntilClose),
 			Codec.INT.optionalFieldOf("max_damage", 4).forGetter(PaintballConfig::getMaxDamage),
 			Codec.BOOL.optionalFieldOf("allow_friendly_fire", false).forGetter(PaintballConfig::shouldAllowFriendlyFire),
+			Codec.BOOL.optionalFieldOf("revival", true).forGetter(PaintballConfig::hasRevival),
 			Codec.INT.optionalFieldOf("stain_radius", 2).forGetter(PaintballConfig::getStainRadius)
 		).apply(instance, PaintballConfig::new);
 	});
@@ -31,9 +32,10 @@ public class PaintballConfig {
 	private final IntProvider ticksUntilClose;
 	private final int maxDamage;
 	private final boolean allowFriendlyFire;
+	private final boolean revival;
 	private final int stainRadius;
 
-	public PaintballConfig(Identifier map, PlayerConfig playerConfig, GameTeamList teams, StainRemovalConfig stainRemoval, IntProvider ticksUntilClose, int maxDamage, boolean allowFriendlyFire, int stainRadius) {
+	public PaintballConfig(Identifier map, PlayerConfig playerConfig, GameTeamList teams, StainRemovalConfig stainRemoval, IntProvider ticksUntilClose, int maxDamage, boolean allowFriendlyFire, boolean revival, int stainRadius) {
 		this.map = map;
 		this.playerConfig = playerConfig;
 		this.teams = teams;
@@ -41,6 +43,7 @@ public class PaintballConfig {
 		this.ticksUntilClose = ticksUntilClose;
 		this.maxDamage = maxDamage;
 		this.allowFriendlyFire = allowFriendlyFire;
+		this.revival = revival;
 		this.stainRadius = stainRadius;
 	}
 
@@ -70,6 +73,10 @@ public class PaintballConfig {
 
 	public boolean shouldAllowFriendlyFire() {
 		return this.allowFriendlyFire;
+	}
+
+	public boolean hasRevival() {
+		return this.revival;
 	}
 
 	public int getStainRadius() {

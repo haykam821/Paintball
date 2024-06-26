@@ -13,12 +13,15 @@ import io.github.haykam821.paintball.game.StainRemovalConfig;
 import io.github.haykam821.paintball.game.event.LaunchPaintballEvent;
 import io.github.haykam821.paintball.game.map.BlockStaining;
 import io.github.haykam821.paintball.game.map.PaintballMap;
+import io.github.haykam821.paintball.game.player.EliminationResult;
 import io.github.haykam821.paintball.game.player.PlayerEntry;
 import io.github.haykam821.paintball.game.player.WinManager;
 import io.github.haykam821.paintball.game.player.armor.ArmorSet;
 import io.github.haykam821.paintball.game.player.armor.StainedArmorHelper;
 import io.github.haykam821.paintball.game.player.team.TeamEntry;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.entity.projectile.thrown.PotionEntity;
 import net.minecraft.entity.projectile.thrown.SnowballEntity;
@@ -33,6 +36,8 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.DyeColor;
+import net.minecraft.util.Hand;
+import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Vec3d;
@@ -54,10 +59,12 @@ import xyz.nucleoid.plasmid.game.player.PlayerOffer;
 import xyz.nucleoid.plasmid.game.player.PlayerOfferResult;
 import xyz.nucleoid.plasmid.game.rule.GameRuleType;
 import xyz.nucleoid.plasmid.util.BlockTraversal;
+import xyz.nucleoid.stimuli.event.item.ItemUseEvent;
 import xyz.nucleoid.stimuli.event.player.PlayerDeathEvent;
+import xyz.nucleoid.stimuli.event.player.PlayerSpectateEntityEvent;
 import xyz.nucleoid.stimuli.event.projectile.ProjectileHitEvent;
 
-public class PaintballActivePhase implements ProjectileHitEvent.Block, ProjectileHitEvent.Entity, GameActivityEvents.Enable, GameActivityEvents.Tick, LaunchPaintballEvent, GamePlayerEvents.Offer, PlayerDeathEvent, GamePlayerEvents.Remove {
+public class PaintballActivePhase implements ProjectileHitEvent.Block, ProjectileHitEvent.Entity, GameActivityEvents.Enable, GameActivityEvents.Tick, LaunchPaintballEvent, GamePlayerEvents.Offer, ItemUseEvent, PlayerDeathEvent, PlayerSpectateEntityEvent, GamePlayerEvents.Remove {
 	private final ServerWorld world;
 	private final GameSpace gameSpace;
 	private final PaintballMap map;
@@ -107,6 +114,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 		activity.deny(GameRuleType.PORTALS);
 		activity.deny(Main.PROJECTILE_BARRIER_COLLISION);
 		activity.deny(GameRuleType.PVP);
+		activity.deny(GameRuleType.SWAP_OFFHAND);
 		activity.deny(GameRuleType.THROW_ITEMS);
 		activity.deny(GameRuleType.USE_BLOCKS);
 		activity.deny(GameRuleType.USE_ENTITIES);
@@ -142,7 +150,9 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 			activity.listen(GameActivityEvents.TICK, phase);
 			activity.listen(LaunchPaintballEvent.EVENT, phase);
 			activity.listen(GamePlayerEvents.OFFER, phase);
+			activity.listen(ItemUseEvent.EVENT, phase);
 			activity.listen(PlayerDeathEvent.EVENT, phase);
+			activity.listen(PlayerSpectateEntityEvent.EVENT, phase);
 			activity.listen(GamePlayerEvents.REMOVE, phase);
 		});
 	}
@@ -222,9 +232,8 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 		while (iterator.hasNext()) {
 			PlayerEntry entry = iterator.next();
 
-			Text elimination = entry.tick();
-			if (elimination != null) {
-				entry.eliminate(elimination, false);
+			EliminationResult result = entry.tick();
+			if (result != null && entry.eliminate(result, false)) {
 				iterator.remove();
 			}
 		}
@@ -264,6 +273,18 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 			offer.player().changeGameMode(GameMode.SPECTATOR);
 		});
 	}
+	
+	@Override
+	public TypedActionResult<ItemStack> onUse(ServerPlayerEntity player, Hand hand) {
+		ItemStack stack = player.getStackInHand(hand);
+		PlayerEntry entry = this.getPlayerEntry(player);
+
+		if (entry != null && this.isStainRemovalStack(stack)) {
+			entry.decrementStainRemovers();
+		}
+
+		return TypedActionResult.pass(stack);
+	}
 
 	@Override
 	public ActionResult onDeath(ServerPlayerEntity player, DamageSource source) {
@@ -271,10 +292,15 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 	}
 
 	@Override
+	public ActionResult onSpectateEntity(ServerPlayerEntity player, Entity target) {
+		return target instanceof ArmorStandEntity ? ActionResult.FAIL : ActionResult.PASS;
+	}
+
+	@Override
 	public void onRemovePlayer(ServerPlayerEntity player) {
 		PlayerEntry entry = this.getPlayerEntry(player);
 		if (entry != null) {
-			entry.eliminate(true);
+			entry.eliminateFromGameRemove(true);
 		}
 	}
 
@@ -308,6 +334,15 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 		this.gameSpace.getPlayers().sendMessage(message);
 	}
 
+	private boolean isStainRemovalStack(ItemStack stack) {
+		StainRemovalConfig config = this.getConfig().getStainRemoval();
+
+		Optional<RegistryEntryList<Item>> items = config.getItems();
+		if (items.isEmpty()) return false;
+
+		return items.get().contains(stack.getRegistryEntry());
+	}
+
 	/**
 	 * @return whether this projectile acted as a stain remover
 	 */
@@ -315,11 +350,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 		StainRemovalConfig config = this.getConfig().getStainRemoval();
 
 		if (!(projectile instanceof PotionEntity potion)) return false;
-
-		Optional<RegistryEntryList<Item>> items = config.getItems();
-
-		if (items.isEmpty()) return false;
-		if (!items.get().contains(potion.getStack().getRegistryEntry())) return false;
+		if (!this.isStainRemovalStack(potion.getStack())) return false;
 
 		if (!(projectile.getOwner() instanceof ServerPlayerEntity player)) return false;
 
@@ -329,7 +360,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 		float radius = config.radius().get(this.world.getRandom());
 
 		for (PlayerEntry entry : this.players) {
-			if (owner.getTeam() == entry.getTeam() && entry.getPlayer().getPos().distanceTo(pos) <= radius) {
+			if (owner.getTeam() == entry.getTeam() && entry.getRecoveryPos().distanceTo(pos) <= radius) {
 				entry.recover(config);
 			}
 		}
