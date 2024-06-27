@@ -14,7 +14,7 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.item.SkullItem;
+import net.minecraft.item.PlayerHeadItem;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtHelper;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -26,7 +26,7 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 
 public class RevivalMarker {
-	private static final Vec3d HEAD_DISPLAY_OFFSET = new Vec3d(0, 1.4825, 0);
+	private static final Vec3d HEAD_DISPLAY_OFFSET = new Vec3d(0, 1.975, 0);
 
 	private final ArmorStandEntity bodyEntity;
 	private final HolderAttachment attachment;
@@ -86,7 +86,7 @@ public class RevivalMarker {
 		NbtCompound skullOwner = NbtHelper.writeGameProfile(new NbtCompound(), profile);
 
 		ItemStack stack = new ItemStack(Items.PLAYER_HEAD);
-		stack.getOrCreateNbt().put(SkullItem.SKULL_OWNER_KEY, skullOwner);
+		stack.getOrCreateNbt().put(PlayerHeadItem.SKULL_OWNER_KEY, skullOwner);
 
 		return stack;
 	}
@@ -118,7 +118,7 @@ public class RevivalMarker {
 		ItemDisplayElement headElement = new ItemDisplayElement(createHeadStack(player));
 
 		Matrix4f transformation = new Matrix4f()
-			.translate(0, -0.05f, 0)
+			.translate(0, -0.55f, 0)
 			.rotateY(MathHelper.PI)
 			.rotateY(-player.getYaw() * MathHelper.RADIANS_PER_DEGREE)
 			.rotateX(-player.getPitch() * MathHelper.RADIANS_PER_DEGREE)
