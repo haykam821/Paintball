@@ -23,6 +23,7 @@
 	"icon": "assets/paintball/icon.png",
 	"depends": {
 		"fabricloader": ">=0.4.0",
-		"plasmid": ">=0.4.162"
+		"java": ">=21",
+		"plasmid": ">=0.6.0"
 	}
 }

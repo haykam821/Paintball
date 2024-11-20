@@ -1,5 +1,7 @@
 package io.github.haykam821.paintball.game.player;
 
+import java.util.Set;
+
 import io.github.haykam821.paintball.game.StainRemovalConfig;
 import io.github.haykam821.paintball.game.item.PaintballItems;
 import io.github.haykam821.paintball.game.phase.PaintballActivePhase;
@@ -17,7 +19,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.GameMode;
-import xyz.nucleoid.plasmid.util.ItemStackBuilder;
+import xyz.nucleoid.plasmid.api.util.ItemStackBuilder;
 
 public class PlayerEntry {
 	private static final ItemStack HAND_STACK = ItemStackBuilder.of(PaintballItems.PAINTBALL_LAUNCHER)
@@ -72,7 +74,7 @@ public class PlayerEntry {
 		Vec3d pos = marker.getPos();
 		double y = pos.getY() + (spectator ? 1 : 0);
 
-		player.teleport(player.getServerWorld(), pos.getX(), y, pos.getZ(), marker.getYaw(), marker.getPitch());
+		player.teleport(player.getServerWorld(), pos.getX(), y, pos.getZ(), Set.of(), marker.getYaw(), marker.getPitch(), true);
 
 		this.spawnWithoutTeleport(spectator);
 
@@ -154,7 +156,7 @@ public class PlayerEntry {
 		}
 
 		float pitch = (this.player.getRandom().nextFloat() * 0.3f) + 1.2f;
-		this.player.playSound(SoundEvents.ENTITY_PLAYER_SPLASH_HIGH_SPEED, SoundCategory.PLAYERS, 1, pitch);
+		this.player.playSoundToPlayer(SoundEvents.ENTITY_PLAYER_SPLASH_HIGH_SPEED, SoundCategory.PLAYERS, 1, pitch);
 
 		this.applyDamageRepresentation(this.getDamageProgress());
 	}

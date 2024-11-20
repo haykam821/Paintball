@@ -1,5 +1,7 @@
 package io.github.haykam821.paintball.game.map;
 
+import java.util.Set;
+
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -7,9 +9,9 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 import xyz.nucleoid.map_templates.MapTemplate;
 import xyz.nucleoid.map_templates.TemplateRegion;
-import xyz.nucleoid.plasmid.game.player.PlayerOffer;
-import xyz.nucleoid.plasmid.game.player.PlayerOfferResult;
-import xyz.nucleoid.plasmid.game.world.generator.TemplateChunkGenerator;
+import xyz.nucleoid.plasmid.api.game.player.JoinAcceptor;
+import xyz.nucleoid.plasmid.api.game.player.JoinAcceptorResult;
+import xyz.nucleoid.plasmid.api.game.world.generator.TemplateChunkGenerator;
 
 public class PaintballMap {
 	private static final String WAITING_SPAWN_MARKER = "waiting_spawn";
@@ -30,33 +32,33 @@ public class PaintballMap {
 		return this.teleportToSpawn(player, WAITING_SPAWN_MARKER);
 	}
 
-	public PlayerOfferResult.Accept acceptWaitingSpawnOffer(PlayerOffer offer, ServerWorld world) {
-		return this.acceptOffer(offer, world, WAITING_SPAWN_MARKER);
+	public JoinAcceptorResult.Teleport acceptWaitingSpawnOffer(JoinAcceptor acceptor, ServerWorld world) {
+		return this.acceptJoins(acceptor, world, WAITING_SPAWN_MARKER);
 	}
 
 	public boolean teleportToSpectatorSpawn(ServerPlayerEntity player) {
 		return this.teleportToSpawn(player, SPECTATOR_SPAWN_MARKER);
 	}
 
-	public PlayerOfferResult.Accept acceptSpectatorSpawnOffer(PlayerOffer offer, ServerWorld world) {
-		return this.acceptOffer(offer, world, SPECTATOR_SPAWN_MARKER);
+	public JoinAcceptorResult.Teleport acceptSpectatorJoins(JoinAcceptor acceptor, ServerWorld world) {
+		return this.acceptJoins(acceptor, world, SPECTATOR_SPAWN_MARKER);
 	}
 
-	private PlayerOfferResult.Accept acceptOffer(PlayerOffer offer, ServerWorld world, String marker) {
+	private JoinAcceptorResult.Teleport acceptJoins(JoinAcceptor acceptor, ServerWorld world, String marker) {
 		TemplateRegion region = this.template.getMetadata().getFirstRegion(marker);
 		if (region == null) {
-			return offer.accept(world, Vec3d.ZERO);
+			return acceptor.teleport(world, Vec3d.ZERO);
 		}
 
-		return this.acceptOffer(offer, world, region);
+		return this.acceptJoins(acceptor, world, region);
 	}
 
-	private PlayerOfferResult.Accept acceptOffer(PlayerOffer offer, ServerWorld world, TemplateRegion region) {
+	private JoinAcceptorResult.Teleport acceptJoins(JoinAcceptor acceptor, ServerWorld world, TemplateRegion region) {
 		Vec3d pos = region.getBounds().centerBottom();
 		float facing = region.getData().getFloat(FACING_KEY);
 
-		return offer.accept(world, pos).and(() -> {
-			offer.player().setYaw(facing);
+		return acceptor.teleport(world, pos).thenRunForEach(player -> {
+			player.setYaw(facing);
 		});
 	}
 
@@ -72,7 +74,7 @@ public class PaintballMap {
 		Vec3d pos = region.getBounds().centerBottom();
 		float facing = region.getData().getFloat(FACING_KEY);
 
-		player.teleport(player.getServerWorld(), pos.getX(), pos.getY(), pos.getZ(), facing, 0);
+		player.teleport(player.getServerWorld(), pos.getX(), pos.getY(), pos.getZ(), Set.of(), facing, 0, true);
 	}
 
 	public ChunkGenerator createGenerator(MinecraftServer server) {

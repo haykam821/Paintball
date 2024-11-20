@@ -5,8 +5,8 @@ import java.util.Collection;
 import java.util.List;
 
 import io.github.haykam821.paintball.game.player.team.TeamEntry;
+import net.minecraft.component.type.DyedColorComponent;
 import net.minecraft.item.DyeItem;
-import net.minecraft.item.DyeableItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.util.DyeColor;
@@ -39,7 +39,7 @@ public final class StainedArmorHelper {
 	}
 
 	private static int getColorFromDyes(List<DyeItem> dyes) {
-		ItemStack stack = DyeableItem.blendAndSetColor(new ItemStack(Items.LEATHER_BOOTS), dyes);
-		return ((DyeableItem) Items.LEATHER_BOOTS).getColor(stack);
+		ItemStack stack = DyedColorComponent.setColor(new ItemStack(Items.LEATHER_BOOTS), dyes);
+		return DyedColorComponent.getColor(stack, DyedColorComponent.DEFAULT_COLOR);
 	}
 }

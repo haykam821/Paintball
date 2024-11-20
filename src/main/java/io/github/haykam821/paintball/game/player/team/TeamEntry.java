@@ -4,8 +4,8 @@ import io.github.haykam821.paintball.game.phase.PaintballActivePhase;
 import io.github.haykam821.paintball.game.player.armor.ArmorSet;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
-import xyz.nucleoid.plasmid.game.common.team.GameTeamConfig;
-import xyz.nucleoid.plasmid.game.common.team.GameTeamKey;
+import xyz.nucleoid.plasmid.api.game.common.team.GameTeamConfig;
+import xyz.nucleoid.plasmid.api.game.common.team.GameTeamKey;
 
 public class TeamEntry {
 	private final PaintballActivePhase phase;

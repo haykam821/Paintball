@@ -6,14 +6,11 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import io.github.haykam821.paintball.Main;
-import io.github.haykam821.paintball.game.item.PaintballItems;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.potion.PotionUtil;
-import net.minecraft.potion.Potions;
-import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryCodecs;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.entry.RegistryEntryList;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -48,8 +45,8 @@ public record StainRemovalConfig(
 	/**
 	 * Gets the configured stain removers {@linkplain RegistryEntryList registry entry list}, or a default based on the {@code paintball:stain_removers} tag.
 	 */
-	public Optional<RegistryEntryList<Item>> getItems() {
-		return this.items.or(() -> Registries.ITEM.getEntryList(Main.STAIN_REMOVERS));
+	public Optional<RegistryEntryList<Item>> getItems(RegistryWrapper.WrapperLookup registries) {
+		return this.items.or(() -> registries.getOrThrow(RegistryKeys.ITEM).getOptional(Main.STAIN_REMOVERS));
 	}
 
 	/**
@@ -58,16 +55,11 @@ public record StainRemovalConfig(
 	public void give(ServerPlayerEntity player, int count) {
 		Random random = player.getRandom();
 
-		this.getItems()
+		this.getItems(player.getRegistryManager())
 			.flatMap(items -> items.getRandom(random))
 			.map(RegistryEntry::value)
 			.ifPresent(item -> {
 				ItemStack stack = new ItemStack(item, count);
-
-				if (stack.isOf(PaintballItems.STAIN_REMOVER.asItem())) {
-					PotionUtil.setPotion(stack, Potions.WATER);
-				}
-
 				player.giveItemStack(stack);
 			});
 	}

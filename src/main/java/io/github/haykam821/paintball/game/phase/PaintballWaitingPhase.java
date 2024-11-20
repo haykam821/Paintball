@@ -7,26 +7,27 @@ import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.ActionResult;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.GameRules;
 import xyz.nucleoid.fantasy.RuntimeWorldConfig;
-import xyz.nucleoid.plasmid.game.GameActivity;
-import xyz.nucleoid.plasmid.game.GameOpenContext;
-import xyz.nucleoid.plasmid.game.GameOpenProcedure;
-import xyz.nucleoid.plasmid.game.GameResult;
-import xyz.nucleoid.plasmid.game.GameSpace;
-import xyz.nucleoid.plasmid.game.common.GameWaitingLobby;
-import xyz.nucleoid.plasmid.game.common.team.TeamSelectionLobby;
-import xyz.nucleoid.plasmid.game.event.GameActivityEvents;
-import xyz.nucleoid.plasmid.game.event.GamePlayerEvents;
-import xyz.nucleoid.plasmid.game.player.PlayerOffer;
-import xyz.nucleoid.plasmid.game.player.PlayerOfferResult;
-import xyz.nucleoid.plasmid.game.rule.GameRuleType;
+import xyz.nucleoid.plasmid.api.game.GameActivity;
+import xyz.nucleoid.plasmid.api.game.GameOpenContext;
+import xyz.nucleoid.plasmid.api.game.GameOpenProcedure;
+import xyz.nucleoid.plasmid.api.game.GameResult;
+import xyz.nucleoid.plasmid.api.game.GameSpace;
+import xyz.nucleoid.plasmid.api.game.common.GameWaitingLobby;
+import xyz.nucleoid.plasmid.api.game.common.team.TeamSelectionLobby;
+import xyz.nucleoid.plasmid.api.game.event.GameActivityEvents;
+import xyz.nucleoid.plasmid.api.game.event.GamePlayerEvents;
+import xyz.nucleoid.plasmid.api.game.player.JoinAcceptor;
+import xyz.nucleoid.plasmid.api.game.player.JoinAcceptorResult;
+import xyz.nucleoid.plasmid.api.game.player.JoinOffer;
+import xyz.nucleoid.plasmid.api.game.rule.GameRuleType;
+import xyz.nucleoid.stimuli.event.EventResult;
 import xyz.nucleoid.stimuli.event.player.PlayerDamageEvent;
 import xyz.nucleoid.stimuli.event.player.PlayerDeathEvent;
 
-public class PaintballWaitingPhase implements GameActivityEvents.Tick, GamePlayerEvents.Offer, PlayerDamageEvent, PlayerDeathEvent, GameActivityEvents.RequestStart {
+public class PaintballWaitingPhase implements GameActivityEvents.Tick, GamePlayerEvents.Accept, PlayerDamageEvent, PlayerDeathEvent, GameActivityEvents.RequestStart {
 	private final GameSpace gameSpace;
 	private final ServerWorld world;
 	private final PaintballMap map;
@@ -78,7 +79,8 @@ public class PaintballWaitingPhase implements GameActivityEvents.Tick, GamePlaye
 
 			// Listeners
 			activity.listen(GameActivityEvents.TICK, phase);
-			activity.listen(GamePlayerEvents.OFFER, phase);
+			activity.listen(GamePlayerEvents.ACCEPT, phase);
+			activity.listen(GamePlayerEvents.OFFER, JoinOffer::accept);
 			activity.listen(PlayerDamageEvent.EVENT, phase);
 			activity.listen(PlayerDeathEvent.EVENT, phase);
 			activity.listen(GameActivityEvents.REQUEST_START, phase);
@@ -95,21 +97,21 @@ public class PaintballWaitingPhase implements GameActivityEvents.Tick, GamePlaye
 	}
 
 	@Override
-	public PlayerOfferResult onOfferPlayer(PlayerOffer offer) {
-		return this.map.acceptWaitingSpawnOffer(offer, this.world).and(() -> {
-			offer.player().changeGameMode(GameMode.ADVENTURE);
+	public JoinAcceptorResult onAcceptPlayers(JoinAcceptor acceptor) {
+		return this.map.acceptWaitingSpawnOffer(acceptor, this.world).thenRunForEach(player -> {
+			player.changeGameMode(GameMode.ADVENTURE);
 		});
 	}
 
 	@Override
-	public ActionResult onDamage(ServerPlayerEntity player, DamageSource source, float amount) {
-		return ActionResult.FAIL;
+	public EventResult onDamage(ServerPlayerEntity player, DamageSource source, float amount) {
+		return EventResult.DENY;
 	}
 
 	@Override
-	public ActionResult onDeath(ServerPlayerEntity player, DamageSource source) {
+	public EventResult onDeath(ServerPlayerEntity player, DamageSource source) {
 		this.map.teleportToWaitingSpawn(player);
-		return ActionResult.FAIL;
+		return EventResult.DENY;
 	}
 
 	@Override

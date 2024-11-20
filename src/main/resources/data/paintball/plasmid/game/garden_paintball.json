@@ -9,12 +9,10 @@
 	"teams": [
 		{
 			"key": "red",
-			"name": "Red",
 			"color": "red"
 		},
 		{
 			"key": "blue",
-			"name": "Blue",
 			"color": "blue"
 		}
 	]

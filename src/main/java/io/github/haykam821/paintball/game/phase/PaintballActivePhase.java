@@ -37,34 +37,36 @@ import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.DyeColor;
 import net.minecraft.util.Hand;
-import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
-import xyz.nucleoid.plasmid.game.GameActivity;
-import xyz.nucleoid.plasmid.game.GameCloseReason;
-import xyz.nucleoid.plasmid.game.GameSpace;
-import xyz.nucleoid.plasmid.game.common.GlobalWidgets;
-import xyz.nucleoid.plasmid.game.common.team.GameTeam;
-import xyz.nucleoid.plasmid.game.common.team.GameTeamConfig;
-import xyz.nucleoid.plasmid.game.common.team.GameTeamKey;
-import xyz.nucleoid.plasmid.game.common.team.TeamChat;
-import xyz.nucleoid.plasmid.game.common.team.TeamManager;
-import xyz.nucleoid.plasmid.game.common.team.TeamSelectionLobby;
-import xyz.nucleoid.plasmid.game.event.GameActivityEvents;
-import xyz.nucleoid.plasmid.game.event.GamePlayerEvents;
-import xyz.nucleoid.plasmid.game.player.PlayerOffer;
-import xyz.nucleoid.plasmid.game.player.PlayerOfferResult;
-import xyz.nucleoid.plasmid.game.rule.GameRuleType;
-import xyz.nucleoid.plasmid.util.BlockTraversal;
+import xyz.nucleoid.plasmid.api.game.GameActivity;
+import xyz.nucleoid.plasmid.api.game.GameCloseReason;
+import xyz.nucleoid.plasmid.api.game.GameSpace;
+import xyz.nucleoid.plasmid.api.game.common.GlobalWidgets;
+import xyz.nucleoid.plasmid.api.game.common.team.GameTeam;
+import xyz.nucleoid.plasmid.api.game.common.team.GameTeamConfig;
+import xyz.nucleoid.plasmid.api.game.common.team.GameTeamKey;
+import xyz.nucleoid.plasmid.api.game.common.team.TeamChat;
+import xyz.nucleoid.plasmid.api.game.common.team.TeamManager;
+import xyz.nucleoid.plasmid.api.game.common.team.TeamSelectionLobby;
+import xyz.nucleoid.plasmid.api.game.event.GameActivityEvents;
+import xyz.nucleoid.plasmid.api.game.event.GamePlayerEvents;
+import xyz.nucleoid.plasmid.api.game.player.JoinAcceptor;
+import xyz.nucleoid.plasmid.api.game.player.JoinAcceptorResult;
+import xyz.nucleoid.plasmid.api.game.player.JoinOffer;
+import xyz.nucleoid.plasmid.api.game.player.PlayerSet;
+import xyz.nucleoid.plasmid.api.game.rule.GameRuleType;
+import xyz.nucleoid.plasmid.api.util.BlockTraversal;
+import xyz.nucleoid.stimuli.event.EventResult;
 import xyz.nucleoid.stimuli.event.item.ItemUseEvent;
 import xyz.nucleoid.stimuli.event.player.PlayerDeathEvent;
 import xyz.nucleoid.stimuli.event.player.PlayerSpectateEntityEvent;
 import xyz.nucleoid.stimuli.event.projectile.ProjectileHitEvent;
 
-public class PaintballActivePhase implements ProjectileHitEvent.Block, ProjectileHitEvent.Entity, GameActivityEvents.Enable, GameActivityEvents.Tick, LaunchPaintballEvent, GamePlayerEvents.Offer, ItemUseEvent, PlayerDeathEvent, PlayerSpectateEntityEvent, GamePlayerEvents.Remove {
+public class PaintballActivePhase implements ProjectileHitEvent.Block, ProjectileHitEvent.Entity, GameActivityEvents.Enable, GameActivityEvents.Tick, LaunchPaintballEvent, GamePlayerEvents.Accept, ItemUseEvent, PlayerDeathEvent, PlayerSpectateEntityEvent, GamePlayerEvents.Remove {
 	private final ServerWorld world;
 	private final GameSpace gameSpace;
 	private final PaintballMap map;
@@ -83,10 +85,12 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 		this.map = map;
 		this.config = config;
 
-		this.players = new HashSet<>(this.gameSpace.getPlayers().size());
+		PlayerSet participants = this.gameSpace.getPlayers().participants();
+
+		this.players = new HashSet<>(participants.size());
 		this.teamManager = teamManager;
 
-		for (ServerPlayerEntity player : this.gameSpace.getPlayers()) {
+		for (ServerPlayerEntity player : participants) {
 			GameTeamKey teamKey = this.teamManager.teamFor(player);
 			
 			TeamEntry teamEntry = this.teams.get(teamKey);
@@ -134,7 +138,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 				teamManager.addTeam(team.key(), teamConfig);
 			}
 
-			teamSelection.allocate(gameSpace.getPlayers(), (teamKey, player) -> {
+			teamSelection.allocate(gameSpace.getPlayers().participants(), (teamKey, player) -> {
 				teamManager.addPlayerTo(player, teamKey);
 			});
 
@@ -149,7 +153,8 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 			activity.listen(GameActivityEvents.ENABLE, phase);
 			activity.listen(GameActivityEvents.TICK, phase);
 			activity.listen(LaunchPaintballEvent.EVENT, phase);
-			activity.listen(GamePlayerEvents.OFFER, phase);
+			activity.listen(GamePlayerEvents.ACCEPT, phase);
+			activity.listen(GamePlayerEvents.OFFER, JoinOffer::acceptSpectators);
 			activity.listen(ItemUseEvent.EVENT, phase);
 			activity.listen(PlayerDeathEvent.EVENT, phase);
 			activity.listen(PlayerSpectateEntityEvent.EVENT, phase);
@@ -159,7 +164,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 
 	// Listeners
 	@Override
-	public ActionResult onHitBlock(ProjectileEntity entity, BlockHitResult hitResult) {
+	public EventResult onHitBlock(ProjectileEntity entity, BlockHitResult hitResult) {
 		if (!this.tryApplyStainRemoval(hitResult.getPos(), entity) && this.config.getStainRadius() > 0) {
 			if (entity.getOwner() instanceof ServerPlayerEntity) {
 				PlayerEntry entry = this.getPlayerEntry((ServerPlayerEntity) entity.getOwner());
@@ -177,11 +182,11 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 			}
 		}
 
-		return ActionResult.FAIL;
+		return EventResult.DENY;
 	}
 
 	@Override
-	public ActionResult onHitEntity(ProjectileEntity entity, EntityHitResult hitResult) {
+	public EventResult onHitEntity(ProjectileEntity entity, EntityHitResult hitResult) {
 		if (!this.tryApplyStainRemoval(hitResult.getPos(), entity) && hitResult.getEntity() instanceof ServerPlayerEntity) {
 			ServerPlayerEntity player = (ServerPlayerEntity) hitResult.getEntity();
 
@@ -196,7 +201,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 						if (this.config.shouldAllowFriendlyFire() || ownerEntry.getTeam() != entry.getTeam()) {
 							entry.damage(ownerEntry);
 						}
-						return ActionResult.FAIL;
+						return EventResult.DENY;
 					}
 				}
 
@@ -204,7 +209,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 			}
 		}
 
-		return ActionResult.FAIL;
+		return EventResult.DENY;
 	}
 
 	@Override
@@ -213,6 +218,11 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 
 		for (PlayerEntry entry : this.players) {
 			entry.spawn(false);
+		}
+
+		for (ServerPlayerEntity player : this.gameSpace.getPlayers().spectators()) {
+			this.map.teleportToSpectatorSpawn(player);
+			player.changeGameMode(GameMode.SPECTATOR);
 		}
 	}
 
@@ -261,21 +271,21 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 			item = Items.WHITE_DYE;
 		}
 		
-		SnowballEntity projectile = new SnowballEntity(world, player);
-		projectile.setItem(new ItemStack(item));
+		ItemStack stack = new ItemStack(item);
+		SnowballEntity projectile = new SnowballEntity(world, player, stack);
 
 		return projectile;
 	}
 
 	@Override
-	public PlayerOfferResult onOfferPlayer(PlayerOffer offer) {
-		return this.map.acceptSpectatorSpawnOffer(offer, this.world).and(() -> {
-			offer.player().changeGameMode(GameMode.SPECTATOR);
+	public JoinAcceptorResult onAcceptPlayers(JoinAcceptor acceptor) {
+		return this.map.acceptSpectatorJoins(acceptor, this.world).thenRunForEach(player -> {
+			player.changeGameMode(GameMode.SPECTATOR);
 		});
 	}
 	
 	@Override
-	public TypedActionResult<ItemStack> onUse(ServerPlayerEntity player, Hand hand) {
+	public ActionResult onUse(ServerPlayerEntity player, Hand hand) {
 		ItemStack stack = player.getStackInHand(hand);
 		PlayerEntry entry = this.getPlayerEntry(player);
 
@@ -283,17 +293,17 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 			entry.decrementStainRemovers();
 		}
 
-		return TypedActionResult.pass(stack);
+		return ActionResult.PASS;
 	}
 
 	@Override
-	public ActionResult onDeath(ServerPlayerEntity player, DamageSource source) {
-		return ActionResult.FAIL;
+	public EventResult onDeath(ServerPlayerEntity player, DamageSource source) {
+		return EventResult.DENY;
 	}
 
 	@Override
-	public ActionResult onSpectateEntity(ServerPlayerEntity player, Entity target) {
-		return target instanceof ArmorStandEntity ? ActionResult.FAIL : ActionResult.PASS;
+	public EventResult onSpectateEntity(ServerPlayerEntity player, Entity target) {
+		return target instanceof ArmorStandEntity ? EventResult.DENY : EventResult.PASS;
 	}
 
 	@Override
@@ -337,7 +347,7 @@ public class PaintballActivePhase implements ProjectileHitEvent.Block, Projectil
 	private boolean isStainRemovalStack(ItemStack stack) {
 		StainRemovalConfig config = this.getConfig().getStainRemoval();
 
-		Optional<RegistryEntryList<Item>> items = config.getItems();
+		Optional<RegistryEntryList<Item>> items = config.getItems(this.world.getRegistryManager());
 		if (items.isEmpty()) return false;
 
 		return items.get().contains(stack.getRegistryEntry());
