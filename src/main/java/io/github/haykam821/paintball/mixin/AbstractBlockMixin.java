@@ -12,13 +12,13 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.EntityShapeContext;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.util.ActionResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
-import xyz.nucleoid.plasmid.game.manager.GameSpaceManager;
-import xyz.nucleoid.plasmid.game.manager.ManagedGameSpace;
+import xyz.nucleoid.plasmid.api.game.GameSpace;
+import xyz.nucleoid.plasmid.api.game.GameSpaceManager;
+import xyz.nucleoid.stimuli.event.EventResult;
 
 @Mixin(AbstractBlock.class)
 public class AbstractBlockMixin {
@@ -29,9 +29,9 @@ public class AbstractBlockMixin {
 		if (!(context instanceof EntityShapeContext entityContext)) return;
 		if (!(entityContext.getEntity() instanceof ProjectileEntity entity)) return;
 
-		ManagedGameSpace gameSpace = GameSpaceManager.get().byWorld(entity.getWorld());
+		GameSpace gameSpace = GameSpaceManager.get().byWorld(entity.getWorld());
 		if (gameSpace == null) return;
-		if (gameSpace.getBehavior().testRule(Main.PROJECTILE_BARRIER_COLLISION) != ActionResult.FAIL) return;
+		if (gameSpace.getBehavior().testRule(Main.PROJECTILE_BARRIER_COLLISION) != EventResult.DENY) return;
 
 		ci.setReturnValue(VoxelShapes.empty());
 	}

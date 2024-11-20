@@ -6,7 +6,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.util.DyeColor;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import xyz.nucleoid.plasmid.util.ColoredBlocks;
+import xyz.nucleoid.plasmid.api.util.ColoredBlocks;
 
 public final class BlockStaining {
 	private BlockStaining() {

@@ -10,13 +10,12 @@ import eu.pb4.polymer.virtualentity.api.attachment.EntityAttachment;
 import eu.pb4.polymer.virtualentity.api.attachment.HolderAttachment;
 import eu.pb4.polymer.virtualentity.api.elements.ItemDisplayElement;
 import io.github.haykam821.paintball.mixin.ArmorStandEntityAccessor;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.ProfileComponent;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.item.PlayerHeadItem;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtHelper;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Arm;
@@ -83,10 +82,9 @@ public class RevivalMarker {
 
 	private static ItemStack createHeadStack(ServerPlayerEntity player) {
 		GameProfile profile = player.getGameProfile();
-		NbtCompound skullOwner = NbtHelper.writeGameProfile(new NbtCompound(), profile);
 
 		ItemStack stack = new ItemStack(Items.PLAYER_HEAD);
-		stack.getOrCreateNbt().put(PlayerHeadItem.SKULL_OWNER_KEY, skullOwner);
+		stack.set(DataComponentTypes.PROFILE, new ProfileComponent(profile));
 
 		return stack;
 	}

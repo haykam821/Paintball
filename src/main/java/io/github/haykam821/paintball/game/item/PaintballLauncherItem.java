@@ -10,16 +10,17 @@ import net.minecraft.item.DyeItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
-import net.minecraft.network.packet.s2c.play.CooldownUpdateS2CPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.stat.Stats;
+import net.minecraft.util.ActionResult;
 import net.minecraft.util.DyeColor;
 import net.minecraft.util.Hand;
-import net.minecraft.util.TypedActionResult;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
+import xyz.nucleoid.packettweaker.PacketContext;
 import xyz.nucleoid.stimuli.EventInvokers;
 import xyz.nucleoid.stimuli.Stimuli;
 
@@ -45,8 +46,6 @@ public class PaintballLauncherItem extends Item implements PolymerItem {
 	}
 
 	private ProjectileEntity createDefaultProjectile(World world, ServerPlayerEntity player) {
-		SnowballEntity projectile = new SnowballEntity(world, player);
-
 		DyeColor color = DyeColor.byId(world.getRandom().nextInt(DYE_COLORS));
 		if (color == null) {
 			color = DyeColor.WHITE;
@@ -57,7 +56,9 @@ public class PaintballLauncherItem extends Item implements PolymerItem {
 			item = Items.WHITE_DYE;
 		}
 
-		projectile.setItem(new ItemStack(item));
+		ItemStack stack = new ItemStack(item);
+		SnowballEntity projectile = new SnowballEntity(world, player, stack);
+
 		return projectile;
 	}
 
@@ -77,10 +78,10 @@ public class PaintballLauncherItem extends Item implements PolymerItem {
 	}
 
 	@Override
-	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
+	public ActionResult use(World world, PlayerEntity user, Hand hand) {
 		ItemStack stack = user.getStackInHand(hand);
 		if (world.isClient()) {
-			return TypedActionResult.success(stack);
+			return ActionResult.SUCCESS;
 		}
 
 		ServerPlayerEntity serverPlayer = (ServerPlayerEntity) user;
@@ -92,25 +93,21 @@ public class PaintballLauncherItem extends Item implements PolymerItem {
 			this.playSound(this.getLaunchSound(world, serverPlayer), world, serverPlayer);
 			serverPlayer.incrementStat(Stats.USED.getOrCreateStat(this));
 
-			setPolymerItemCooldown(serverPlayer, stack, COOLDOWN);
+			serverPlayer.getItemCooldownManager().set(stack, COOLDOWN);
 
 			world.spawnEntity(projectile);
 		}
 
-		return TypedActionResult.consume(stack);
+		return ActionResult.CONSUME;
 	}
 
 	@Override
-	public Item getPolymerItem(ItemStack stack, ServerPlayerEntity player) {
+	public Item getPolymerItem(ItemStack stack, PacketContext context) {
 		return Items.DIAMOND_HORSE_ARMOR;
 	}
 
-	private static void setPolymerItemCooldown(ServerPlayerEntity player, ItemStack stack, int duration) {
-		player.getItemCooldownManager().set(stack.getItem(), COOLDOWN);
-
-		if (stack.getItem() instanceof PolymerItem polymerItem) {
-			Item item = polymerItem.getPolymerItem(stack, player);
-			player.networkHandler.sendPacket(new CooldownUpdateS2CPacket(item, COOLDOWN));
-		}
+	@Override
+	public Identifier getPolymerItemModel(ItemStack stack, PacketContext context) {
+		return null;
 	}
 }

@@ -5,7 +5,7 @@ import net.minecraft.item.ItemConvertible;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.text.Text;
-import xyz.nucleoid.plasmid.util.ItemStackBuilder;
+import xyz.nucleoid.plasmid.api.util.ItemStackBuilder;
 
 public class ArmorSet {
 	private static final String HELMET_KEY = "helmet";
